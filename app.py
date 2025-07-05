@@ -70,6 +70,15 @@ def get_clientes(user):
     response = supabase.table('clientes').select("*").order('nombre').execute()
     return jsonify(response.data)
 
+@app.route('/api/ventas', methods=['GET'])
+@token_required
+def get_ventas(user):
+    try:
+        response = supabase.table('ventas').select('*, clientes(*)').order('fecha', desc=True).execute()
+        return jsonify(response.data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/productos', methods=['GET'])
 @token_required
 def get_productos(user):
