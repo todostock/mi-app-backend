@@ -45,6 +45,30 @@ def token_required(f):
 
 # --- RUTAS ---
 
+@app.route('/api/productos', methods=['POST'])
+@token_required
+def create_producto(user):
+    try:
+        data = request.get_json()
+        if not all(k in data for k in ['codigo_producto', 'nombre_producto', 'stock']):
+            return jsonify({"error": "Código, nombre y stock son requeridos"}), 400
+        response = supabase.table('productos').insert(data).execute()
+        return jsonify(response.data), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/clientes', methods=['POST'])
+@token_required
+def create_cliente(user):
+    try:
+        data = request.get_json()
+        if not all(k in data for k in ['nombre', 'rut', 'direccion', 'telefono']):
+            return jsonify({"error": "Nombre, RUT, Dirección y Teléfono son requeridos"}), 400
+        response = supabase.table('clientes').insert(data).execute()
+        return jsonify(response.data), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/')
 def home():
     return "¡El Backend de TodoStock SPA está funcionando!"
