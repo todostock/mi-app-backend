@@ -45,6 +45,46 @@ def token_required(f):
 
 # --- RUTAS ---
 
+@app.route('/api/ventas', methods=['POST'])
+@token_required
+def create_venta(user):
+    try:
+        data = request.get_json()
+        # Validación de datos básicos
+        if not all(k in data for k in ['cliente_id', 'es_afecta_iva', 'detalles']):
+            return jsonify({"error": "Faltan datos de la venta"}), 400
+        if not data['detalles']:
+            return jsonify({"error": "La venta debe tener al menos un producto"}), 400
+
+        # Descontar el stock de cada producto
+        for item in data['detalles']:
+            producto_actual = supabase.table('productos').select('stock').eq('id', item['producto_id']).single().execute().data
+            if producto_actual['stock'] < item['cantidad']:
+                return jsonify({"error": f"Stock insuficiente para el producto id {item['producto_id']}"}), 400
+            nuevo_stock = producto_actual['stock'] - item['cantidad']
+            supabase.table('productos').update({'stock': nuevo_stock}).eq('id', item['producto_id']).execute()
+
+        # Calcular el total y crear el registro de la venta
+        total_venta = sum(item['cantidad'] * item['precio_unitario'] for item in data['detalles'])
+        venta_data = {
+            'cliente_id': data['cliente_id'], 'es_afecta_iva': data['es_afecta_iva'],
+            'cantidad_bultos': data.get('cantidad_bultos', 1), 'total': total_venta
+        }
+        if data.get('fecha'):
+            venta_data['fecha'] = data['fecha']
+
+        venta_creada = supabase.table('ventas').insert(venta_data).execute().data[0]
+
+        # Crear los detalles de la venta
+        detalles_data = [{'venta_id': venta_creada['id'], 'producto_id': item['producto_id'],
+                          'cantidad': item['cantidad'], 'precio_unitario': item['precio_unitario']}
+                         for item in data['detalles']]
+        supabase.table('detalles_venta').insert(detalles_data).execute()
+
+        return jsonify({"message": "Venta creada exitosamente", "venta": venta_creada}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/productos', methods=['POST'])
 @token_required
 def create_producto(user):
